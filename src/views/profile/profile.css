@@ -1,0 +1,9 @@
+.p_wrapper {
+    height: 100vh;
+    /* Set height to full viewport height */
+}
+
+.p_body {
+    width: 100%;
+    /* Ensure the content takes up full width */
+}
