@@ -127,7 +127,7 @@ export const Profile = () => {
               <h1 onClick={deletionUser} className='capitalize hover:underline cursor-pointer'>delete my account</h1>
             </div>
             <div className="bg-success flex justify-between items-center">
-              <button onClick={submit} className='r_btn font-bold capitalize'>update</button>
+              <button onClick={submit} className='r_btn font-bold hover:bg-blue-700 capitalize'>update</button>
               <button onClick={logOut} className='r_btn max-md:ml-2 bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded capitalize'>logout</button>
             </div>
           </form>
