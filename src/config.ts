@@ -1,1 +1,1 @@
-export const URL = "charge-mate.railway.internal";
+export const URL = "charge-mate.up.railway.app";
