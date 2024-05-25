@@ -47,6 +47,7 @@ export const Family = () => {
     const decodedUser: decodedUserProps = jwt ? jwtDecode(jwt) :
         { exp: 0, iat: 0, nickname: '', password: '', role: '', _id: '' };
 
+    const [loading, setLoading] = useState(false);
     // Extract unique values
     const uniqueTitles = Array.from(new Set(familyCharges.map(charge => charge.title)));
     // Extract unique non-null categories
@@ -117,12 +118,15 @@ export const Family = () => {
 
     const fetchFamily = async () => {
         try {
+            setLoading(true)
             const res = await axios.get(`${URL}/families/getinfo`, {
                 headers: { Authorization: jwt && JSON?.parse(jwt) }
             })
             setFetchedFamily(res?.data[0])
         } catch (err) {
             Notify(LogError(err as AxiosError), 'err')
+        } finally {
+            setLoading(false)
         }
     }
 
@@ -139,12 +143,15 @@ export const Family = () => {
 
     const fetchFamilyCharges = async () => {
         try {
+            setLoading(true)
             const res = await axios.get(`${URL}/charges/getfamilycharges`, {
                 headers: { Authorization: jwt ? JSON.parse(jwt) : undefined } // Handling jwt parsing
             })
             setFamilyCharges(res?.data)
         } catch (err) {
             Notify(LogError(err as AxiosError), 'err')
+        } finally {
+            setLoading(false)
         }
     }
 
@@ -240,6 +247,11 @@ export const Family = () => {
 
     return (
         <>
+            {loading && (
+                <div className="fixed inset-0 flex items-center justify-center bg-white bg-opacity-75 z-50">
+                    <div className="loading-spinner"></div>
+                </div>
+            )}
             <div className="f_wrapper relative bg-white dark:bg-gray-800 text-black dark:text-white transition-colors duration-500 in-out-quad">
                 {
                     fetchedUser?.individual &&

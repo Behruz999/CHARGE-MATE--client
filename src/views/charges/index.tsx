@@ -26,6 +26,7 @@ export const Charges = () => {
     quantity: '',
     price: '',
   });
+  const [loading, setLoading] = useState(false);
   // State variable to track whether modal is in "add" or "edit" mode
   const [isEditMode, setIsEditMode] = useState(false);
   const jwt: string | null = localStorage?.getItem('jwt');
@@ -87,26 +88,35 @@ export const Charges = () => {
 
   const fetchFamilyCharges = async () => {
     try {
+      setLoading(true)
       const res = await axios.get(`${URL}/charges/getindividualcharges`, {
         headers: { Authorization: jwt ? JSON.parse(jwt) : undefined } // Handling jwt parsing
       })
       setFamilyCharges(res?.data)
     } catch (err) {
       Notify(LogError(err as AxiosError), 'err')
+    } finally {
+      setLoading(false)
     }
   }
 
   // Function to handle form submission
   const submit = async (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
+    console.log(chargeData);
     e.preventDefault()
+    const updatedChargeData = {
+      ...chargeData,
+      _id: undefined,
+      category: chargeData?.category === "" ? null : chargeData?.category
+    }
     try {
       if (!isEditMode) {
-        const res = await axios.post(`${URL}/charges`, { ...chargeData, _id: undefined }, {
+        const res = await axios.post(`${URL}/charges`, updatedChargeData, {
           headers: { Authorization: jwt && JSON?.parse(jwt) }
         })
         Notify(`${res?.data?.title}'s added`, 'success')
       } else {
-        const res = await axios.patch(`${URL}/charges/${chargeData?._id}`, chargeData, {
+        const res = await axios.patch(`${URL}/charges/${chargeData?._id}`, updatedChargeData, {
           headers: { Authorization: jwt && JSON?.parse(jwt) }
         })
         Notify(`${res?.data?.title}'s modified`, 'success')
@@ -151,95 +161,113 @@ export const Charges = () => {
 
   return (
     <>
-      <div className="ch_wrapper bg-white dark:bg-gray-800 text-black dark:text-white transition-colors duration-500 in-out-quad max-sm:mb-16">
-        {/* Header */}
-        <div className="ch_header text-xl flex flex-col sm:flex-row justify-between items-center mb-10">
-          <div className="flex items-center justify-center sm:justify-start space-x-4">
-            <h1 className="text-3xl capitalize text-center sm:text-left">your charges</h1>
-            {isPhone && (
-              <button
-                onClick={handleAddMode}
-                className={`bg-blue-500 hover:bg-blue-700 ${familyCharges?.length < 1 && 'hidden'} text-white font-bold py-2 px-4 rounded sm:hidden flex items-center space-x-2`}
-              >
-                <MdOutlinePlaylistAdd size={20} />
-              </button>
-            )}
-          </div>
-          {!isPhone && (
-            <button
-              onClick={handleAddMode}
-              className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded hidden sm:block"
-            >
-              Add New Charge
-            </button>
-          )}
+      {loading && (
+        <div className="fixed inset-0 flex items-center justify-center bg-white bg-opacity-75 z-50">
+          <div className="loading-spinner"></div>
         </div>
-        {
+      )}
+      {
+        familyCharges?.length < 1 && !loading ?
+          <>
+            <div className="h-screen flex justify-center items-center">
+              <div>
+                <div className="flex items-center justify-center">
+                  <EmptyCharges message='Your charges are empty. Add some charges to proceed.' onAddChargesClick={() => handleAddMode()} />
+                </div>
+              </div>
+            </div>
+
+          </> :
+          <div className="ch_wrapper bg-white dark:bg-gray-800 text-black dark:text-white transition-colors duration-500 in-out-quad max-sm:mb-16">
+            {/* Header */}
+            <div className="ch_header text-xl flex flex-col sm:flex-row justify-between items-center mb-10">
+              <div className="flex items-center justify-center sm:justify-start space-x-4">
+                <h1 className="text-3xl capitalize text-center sm:text-left">your charges</h1>
+                {isPhone && (
+                  <button
+                    onClick={handleAddMode}
+                    className={`bg-blue-500 hover:bg-blue-700 ${familyCharges?.length < 1 && 'hidden'} text-white font-bold py-2 px-4 rounded sm:hidden flex items-center space-x-2`}
+                  >
+                    <MdOutlinePlaylistAdd size={20} />
+                  </button>
+                )}
+              </div>
+              {!isPhone && (
+                <button
+                  onClick={handleAddMode}
+                  className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded hidden sm:block"
+                >
+                  Add New Charge
+                </button>
+              )}
+            </div>
+            {/* {
           familyCharges?.length < 1 &&
           <>
             <div className="flex items-center justify-center">
               <EmptyCharges message='Your charges are empty. Add some charges to proceed.' onAddChargesClick={() => handleAddMode()} />
             </div>
           </>
-        }
+        } */}
 
-        <div className="container mx-auto p-4">
-          {/* View Reports Button */}
-          {
-            familyCharges?.length > 0 &&
-            <div className="ch_header_btm2 pt-5 mb-5 flex justify-end lg:hidden">
-              <h1 onClick={() => navigate('/reports')} className="capitalize cursor-pointer hover:underline text-xl">view reports</h1>
-            </div>
-          }
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {
-              familyCharges?.map((charge: familyChargesProps, i: number) => {
-                return (
-                  <>
-                    <div key={i} className="bg-white dark:bg-gray-800 text-black dark:text-white transition-colors duration-500 in-out-quad shadow-lg rounded-lg overflow-hidden">
-                      <div className="px-6 py-4">
-                        <div className="font-bold text-xl mb-2">{charge?.title}</div>
-                        <p className="text-base">
-                          <strong>Category:</strong> {charge?.category ? charge?.category : 'Not Defined'}
-                        </p>
-                        <p className="text-base">
-                          <strong>Quantity:</strong> {charge?.quantity}
-                        </p>
-                        <p className="text-base">
-                          <strong>Price:</strong> {charge?.price}
-                          <p className="text-base">
-                            <strong>Currency:</strong> {charge?.currency}
-                          </p>
-                        </p>
-                        <p className="text-base">
-                          <strong>Family:</strong> {charge?.family?.name}
-                        </p>
-                        <p className="text-base">
-                          <strong>User:</strong> {!charge?.individual && charge?.user?.individual ? 'Left the family' : charge?.user?.nickname}
-                        </p>
-                        <p className="text-base">
-                          <strong>Created At:</strong> {charge?.createdAt}
-                        </p>
-                        <p className="text-base">
-                          <strong>Updated At:</strong> {charge?.updatedAt}
-                        </p>
-                        <div className="flex justify-end mt-4">
-                          <button onClick={() => handleEditMode(charge)} className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mr-2">
-                            Edit
-                          </button>
-                          <button onClick={() => deletion(charge)} className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
-                            Delete
-                          </button>
+            <div className="container mx-auto p-4">
+              {/* View Reports Button */}
+              {
+                familyCharges?.length > 0 &&
+                <div className="ch_header_btm2 pt-5 mb-5 flex justify-end lg:hidden">
+                  <h1 onClick={() => navigate('/reports')} className="capitalize cursor-pointer hover:underline text-xl">view reports</h1>
+                </div>
+              }
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {
+                  familyCharges?.map((charge: familyChargesProps, i: number) => {
+                    return (
+                      <>
+                        <div key={i} className="bg-white dark:bg-gray-800 text-black dark:text-white transition-colors duration-500 in-out-quad shadow-lg rounded-lg overflow-hidden">
+                          <div className="px-6 py-4">
+                            <div className="font-bold text-xl mb-2">{charge?.title}</div>
+                            <p className="text-base">
+                              <strong>Category:</strong> {charge?.category ? charge?.category : 'Not Defined'}
+                            </p>
+                            <p className="text-base">
+                              <strong>Quantity:</strong> {charge?.quantity}
+                            </p>
+                            <p className="text-base">
+                              <strong>Price:</strong> {charge?.price}
+                              <p className="text-base">
+                                <strong>Currency:</strong> {charge?.currency}
+                              </p>
+                            </p>
+                            <p className="text-base">
+                              <strong>Family:</strong> {charge?.family?.name}
+                            </p>
+                            <p className="text-base">
+                              <strong>User:</strong> {!charge?.individual && charge?.user?.individual ? 'Left the family' : charge?.user?.nickname}
+                            </p>
+                            <p className="text-base">
+                              <strong>Created At:</strong> {charge?.createdAt}
+                            </p>
+                            <p className="text-base">
+                              <strong>Updated At:</strong> {charge?.updatedAt}
+                            </p>
+                            <div className="flex justify-end mt-4">
+                              <button onClick={() => handleEditMode(charge)} className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mr-2">
+                                Edit
+                              </button>
+                              <button onClick={() => deletion(charge)} className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
+                                Delete
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  </>
-                )
-              })
-            }
+                      </>
+                    )
+                  })
+                }
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+      }
 
 
       {/* Modal */}

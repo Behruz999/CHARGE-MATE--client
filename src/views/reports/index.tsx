@@ -6,7 +6,14 @@ import { MdOutlineCurrencyExchange } from "react-icons/md";
 import { LogError, Notify } from '../../errorHandler/debug';
 import axios, { AxiosError } from 'axios';
 import { URL } from '../../config';
-import { fetchedReportsProps, reportProps, totalProps } from '../../aliases/alias';
+import { jwtDecode } from 'jwt-decode';
+import {
+    fetchedReportsProps,
+    reportProps,
+    totalProps,
+    decodedUserProps,
+    fetchedUserProps
+} from '../../aliases/alias';
 
 export const Reports = () => {
 
@@ -15,15 +22,16 @@ export const Reports = () => {
     const [isAdvancedDate, setIsAdvancedDate] = useState<boolean>(false);
     const [isCurrency, setIsCurrency] = useState<boolean>(false);
     const [fetchedReports, setFetchedReports] = useState<fetchedReportsProps>();
-    const jwt: string | null = localStorage?.getItem('jwt');
+    const [fetchedUser, setFetchedUser] = useState<fetchedUserProps | null>(null);
     const [isToday, setIsToday] = useState<boolean>(false);
     const [isYesterday, setIsYesterday] = useState<boolean>(false);
     const [visibleReports, setVisibleReports] = useState(5); // Initial number of reports to display
     const [loading, setLoading] = useState(false);
+    // const [refreshKey, setRefreshKey] = useState<number>(0);
     const [dateState, setDateState] = useState<{
-        day: number;
-        month: number;
-        year: number;
+        day: number | string;
+        month: number | string;
+        year: number | string;
         today: boolean;
         yesterday: boolean;
         advancedDate: boolean;
@@ -37,6 +45,10 @@ export const Reports = () => {
         advancedDate: false,
         currency: ''
     });
+    const jwt: string | null = localStorage?.getItem('jwt');
+
+    const decodedUser: decodedUserProps = jwt ? jwtDecode(jwt) :
+        { exp: 0, iat: 0, nickname: '', password: '', role: '', _id: '' };
 
     const handleLoadMore = async () => {
         setLoading(true);
@@ -83,6 +95,10 @@ export const Reports = () => {
 
     const referToAdvancedMode = () => {
         setIsAdvancedDate(true)
+        dateState.day = ''
+        dateState.month = ''
+        dateState.year = ''
+        setIsAdvancedDate(true)
         setIsByDate(false)
     }
 
@@ -95,29 +111,47 @@ export const Reports = () => {
         }
     }
 
-    const fetchReports = async () => {
-        const endpoint = isFamilyMode ? 'reports/users/familycharges' : 'reports/users/individualcharges';
+    const fetchUser = async () => {
         try {
-            const res = await axios.get(`${URL}/${endpoint}`, {
-                params: {
-                    day: dateState.day !== 0 ? dateState.day : undefined,
-                    month: dateState.month !== 0 ? dateState.month : undefined,
-                    year: dateState.year !== 0 ? dateState.year : undefined,
-                    today: dateState.today ? dateState.today : undefined,
-                    yesterday: dateState.yesterday ? dateState.yesterday : undefined,
-                    advancedDate: dateState.advancedDate ? dateState.advancedDate : undefined,
-                    currency: dateState.currency !== '' ? dateState.currency : undefined,
-                },
-                headers: { Authorization: jwt && JSON?.parse(jwt) }
-            })
-
-            res?.status === 200 && setFetchedReports(res?.data)
+            const res = await axios.get(`${URL}/users/${decodedUser?._id}`)
+            setFetchedUser(res?.data[0])
         } catch (err) {
             Notify(LogError(err as AxiosError), 'err')
         }
     }
 
-    const formatDateValue = (year: number, month: number, day: number) => {
+    const fetchReports = async () => {
+        setLoading(true)
+        // let endpoint: string;
+        // if (!isFamilyMode || fetchedUser?.individual) {
+        //     endpoint = 'reports/users/individualcharges';
+        // } else {
+        //     endpoint = 'reports/users/familycharges';
+        // }
+        let endpoint = isFamilyMode ? 'reports/users/familycharges' : 'reports/users/individualcharges';
+        try {
+            const res = await axios.get(`${URL}/${endpoint}`, {
+                params: {
+                    day: dateState.day ? dateState.day : undefined,
+                    month: dateState.month ? dateState.month : undefined,
+                    year: dateState.year ? dateState.year : undefined,
+                    today: dateState.today ? dateState.today : undefined,
+                    yesterday: dateState.yesterday ? dateState.yesterday : undefined,
+                    advancedDate: isAdvancedDate ? isAdvancedDate : undefined,
+                    currency: dateState.currency !== '' ? dateState.currency : undefined,
+                },
+                headers: { Authorization: jwt && JSON?.parse(jwt) }
+            });
+
+            res?.status === 200 && setFetchedReports(res?.data);
+        } catch (err) {
+            Notify(LogError(err as AxiosError), 'err')
+        } finally {
+            setLoading(false); // Clear loading state regardless of success or failure
+        }
+    }
+
+    const formatDateValue = (year: number | string, month: number | string, day: number | string) => {
         if (year && month && day) {
             return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         }
@@ -126,6 +160,7 @@ export const Reports = () => {
 
     const handleToday = () => {
         const newToday = !isToday;
+        setIsAdvancedDate(false);
         setIsToday(newToday);
         setIsYesterday(false);
         setDateState((prevState) => ({
@@ -137,6 +172,7 @@ export const Reports = () => {
 
     const handleYesterday = () => {
         const newYesterday = !isYesterday;
+        setIsAdvancedDate(false);
         setIsYesterday(newYesterday);
         setIsToday(false);
         setDateState((prevState) => ({
@@ -147,8 +183,18 @@ export const Reports = () => {
     };
 
     useEffect(() => {
-        fetchReports()
-    }, [dateState, isFamilyMode]);
+        fetchUser();
+    }, []);
+
+    useEffect(() => {
+        if (fetchedUser && fetchedUser.individual !== undefined) {
+            setIsFamilyMode(!fetchedUser.individual);
+        }
+    }, [fetchedUser]);
+
+    useEffect(() => {
+        fetchReports();
+    }, [dateState, isFamilyMode, fetchedUser]);
 
     const reports = fetchedReports?.reports ?? []; // Use optional chaining and fallback
 
@@ -178,16 +224,27 @@ export const Reports = () => {
                         <div className={`section-date flex items-center text-xl mr-3`}>
                             <h1 onClick={() => handleYesterday()} className={`capitalize hover:underline cursor-pointer ${isYesterday && 'underline text-red-500'}`}>yesterday</h1>
                         </div>
+
                         {/* for larger screens */}
-                        <div className={`section-date flex items-center max-md:hidden text-xl mr-3`}>
-                            <h1 onClick={() => setIsFamilyMode(!isFamilyMode)} className='cursor-pointer capitalize hover:underline'>{isFamilyMode ? 'individual' : 'family'} mode</h1>
-                        </div>
+                        {
+                            !fetchedUser?.individual &&
+                            <>
+                                <div className={`section-date flex items-center max-md:hidden text-xl mr-3`}>
+                                    <h1 onClick={() => setIsFamilyMode(!isFamilyMode)} className='cursor-pointer capitalize hover:underline'>{isFamilyMode ? 'individual' : 'family'} mode</h1>
+                                </div>
+                            </>
+                        }
                     </div>
 
                     {/* for smaller screens */}
-                    <div className={`section-date max-md:flex mb-5 items-center mt-4 hidden text-xl mr-3`}>
-                        <h1 onClick={() => setIsFamilyMode(!isFamilyMode)} className='cursor-pointer capitalize hover:underline'>{isFamilyMode ? 'individual' : 'family'} mode</h1>
-                    </div>
+                    {
+                        !fetchedUser?.individual &&
+                        <>
+                            <div className={`section-date max-md:flex mb-5 items-center mt-4 hidden text-xl mr-3`}>
+                                <h1 onClick={() => setIsFamilyMode(!isFamilyMode)} className='cursor-pointer capitalize hover:underline'>{isFamilyMode ? 'individual' : 'family'} mode</h1>
+                            </div>
+                        </>
+                    }
 
                     <div className="section-header capitalize">
                         {
@@ -210,7 +267,7 @@ export const Reports = () => {
                                         isCurrency &&
                                         <>
                                             <label htmlFor="birthday" className="text-sm font-medium text-gray-700 mb-2 flex justify-between">
-                                                <h1 onClick={referToCalendar} className='capitalize hover:underline'>currency</h1>
+                                                <h1 className='capitalize hover:underline'>currency</h1>
                                             </label>
                                             <input
                                                 type="text"
@@ -228,37 +285,41 @@ export const Reports = () => {
                             isAdvancedDate && !isByDate &&
                             <form className="w-full max-w-sm p-6 bg-white dark:bg-gray-800 text-black dark:text-white transition-colors duration-500 in-out-quad rounded-lg shadow-md">
                                 <div className="mb-4">
-                                    <label htmlFor="birthday" className="text-sm font-medium mb-3 flex justify-center">
-                                        <h1 onClick={referToCalendar} className='capitalize hover:underline'>regular format</h1>
+                                    <label htmlFor="regularf" className="text-sm font-medium mb-3 flex justify-center">
+                                        <h1 onClick={() => {
+                                            referToCalendar();
+                                            setIsAdvancedDate(false)
+                                        }
+                                        } className='capitalize hover:underline cursor-pointer'>regular format</h1>
                                     </label>
 
-                                    <label htmlFor="birthday" className="text-sm font-medium mb-2 flex justify-between">
+                                    <label htmlFor="day" className="text-sm font-medium mb-2 flex justify-between">
                                         <h1 onClick={referToCalendar} className='capitalize hover:underline'>day</h1>
                                     </label>
                                     <input
                                         type="number"
-                                        id="birthday"
+                                        id="day"
                                         name="day"
                                         onChange={changeHandlerBasicSake}
                                         className="block my-2 w-full text-black p-2.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                         maxLength={2}
                                     />
-                                    <label htmlFor="birthday" className="text-sm font-medium mb-2 flex justify-between">
+                                    <label htmlFor="month" className="text-sm font-medium mb-2 flex justify-between">
                                         <h1 onClick={referToCalendar} className='capitalize hover:underline'>month</h1>
                                     </label>
                                     <input
                                         type="number"
-                                        id="birthday"
+                                        id="month"
                                         name="month"
                                         onChange={changeHandlerBasicSake}
                                         className="block my-2 w-full text-black p-2.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                     />
-                                    <label htmlFor="birthday" className="text-sm font-medium mb-2 flex justify-between">
+                                    <label htmlFor="year" className="text-sm font-medium mb-2 flex justify-between">
                                         <h1 onClick={referToCalendar} className='capitalize hover:underline'>year</h1>
                                     </label>
                                     <input
                                         type="number"
-                                        id="birthday"
+                                        id='year'
                                         name="year"
                                         onChange={changeHandlerBasicSake}
                                         className="block my-2 w-full text-black p-2.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -266,7 +327,7 @@ export const Reports = () => {
                                     {
                                         isCurrency &&
                                         <>
-                                            <label htmlFor="birthday" className="text-sm font-medium mb-2 flex justify-between">
+                                            <label htmlFor="currency" className="text-sm font-medium mb-2 flex justify-between">
                                                 <h1 onClick={referToCalendar} className='capitalize hover:underline'>currency</h1>
                                             </label>
                                             <input
@@ -282,12 +343,13 @@ export const Reports = () => {
                             </form>
                         }
                     </div>
+
                     {/* Reports Overview */}
                     <div className="section my-5">
                         {
                             isCurrency && isByDate &&
                             <>
-                                <label htmlFor="birthday" className="text-sm font-medium mb-2 flex justify-between">
+                                <label htmlFor="currency" className="text-sm font-medium mb-2 flex justify-between">
                                     <h1 onClick={referToCalendar} className='capitalize hover:underline'>currency</h1>
                                 </label>
                                 <input
@@ -295,7 +357,7 @@ export const Reports = () => {
                                     name="currency"
                                     value={dateState?.currency}
                                     onChange={changeHandler}
-                                    className="block w-full p-2.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-3"
+                                    className="block w-full p-2.5 text-black border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-3"
                                 />
                             </>
                         }
@@ -324,7 +386,7 @@ export const Reports = () => {
                                 {/* Add more details as needed */}
                             </div>
                         ))}
-                        {loading && <div className="loading-spinner">Loading...</div>}
+                        {loading && <div className="loading-spinner"></div>}
                         {visibleReports < reports.length && !loading && (
                             <button onClick={handleLoadMore} className="load-more-button bg-blue-500 text-white py-2 px-4 rounded-md">
                                 Load More
@@ -348,14 +410,27 @@ export const Reports = () => {
                         <div className="section-header mb-1">Large Quantity Items</div>
                         {fetchedReports?.largeQty.map((item: reportProps, index: number) => (
                             <div key={index} className="report-item bg-gray-100 dark:bg-gray-800 text-black dark:text-white transition-colors duration-500 in-out-quad p-4 my-3 rounded-md">
-                                <div className="report-item-header">{item.title}</div>
-                                <div className="report-item-details">Total Amount: {item.total}</div>
-                                <div className="report-item-details">Currency: {item.currency}</div>
+                                <div className="report-item-header">{item?.title}</div>
+                                <div className="report-item-details">Total Amount: {item?.total}</div>
+                                <div className="report-item-details">Currency: {item?.currency}</div>
                             </div>
                         ))}
                     </div>
+
+                    {
+                        fetchedReports?.reports?.length === 0 &&
+                        <>
+                            <div className="flex justify-center items-center pt-28">
+                                <div className="text-center rounded p-8">
+                                    <img src="empty_reports.svg" alt="No reports available" className="mb-4 mx-auto" />
+                                    <h1 className="text-lg font-medium">No data found for the specified case</h1>
+                                </div>
+                            </div>
+                        </>
+                    }
+
                 </div>
-            </div>
+            </div >
         </>
     )
 }
