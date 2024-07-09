@@ -158,6 +158,20 @@ export const Charges = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  const addFiveHours = (dateString: string) => {
+    const date = new Date(dateString);
+    date.setHours(date.getHours() + 5);
+
+    // Extract date components
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are zero-based
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+
+    // Format as "YYYY-MM-DD HH:mm"
+    return `${year}-${month}-${day} ${hours}:${minutes}`;
+  };
 
   return (
     <>
@@ -245,10 +259,10 @@ export const Charges = () => {
                               <strong>User:</strong> {!charge?.individual && charge?.user?.individual ? 'Left the family' : charge?.user?.nickname}
                             </p>
                             <p className="text-base">
-                              <strong>Created At:</strong> {charge?.createdAt}
+                              <strong>Created At:</strong> {addFiveHours(charge?.createdAt)}
                             </p>
                             <p className="text-base">
-                              <strong>Updated At:</strong> {charge?.updatedAt}
+                              <strong>Updated At:</strong> {addFiveHours(charge?.updatedAt)}
                             </p>
                             <div className="flex justify-end mt-4">
                               <button onClick={() => handleEditMode(charge)} className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mr-2">
